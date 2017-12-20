@@ -3,8 +3,13 @@ contract ledger{
     
     
     /* creating map to store data of different datatypes */
-    struct numStruct {  mapping(bytes32=>uint) num; }
-    mapping(address=>numStruct) numData;
+    
+    struct numStruct {  mapping(bytes32=>uint) numValue; }
+    mapping(address=>numStruct) numDatabase;
+    
+    struct stringStruct {  mapping(bytes32=>string) strValue; }
+    mapping(address=>stringStruct) stringDatabase;
+    
 
     /* map to store address of registered user */
     mapping(address=>bool) registeredUsers;
@@ -20,7 +25,7 @@ contract ledger{
     
     
     /* add new user */
-    function registerUser() public returns (bool success){
+    function registerMe() public returns (bool success){
         //prevent already registered user to re-register
         if(registeredUsers[msg.sender]){   
             return false;
@@ -31,7 +36,7 @@ contract ledger{
     }
     
     /* remove  existing user */
-    function removeUser() public returns (bool success){
+    function removeMe() public returns (bool success){
         //prevent unregistered user to delete
         if(registeredUsers[msg.sender]){
             registeredUsers[msg.sender]=false;
@@ -46,23 +51,42 @@ contract ledger{
     
     function setNumber(bytes32 key, uint value) public returns (bool success){
         if (registeredUsers[msg.sender]){   //allow only registered user to set value
-            numData[msg.sender].num[key] = value;
+            numDatabase[msg.sender].numValue[key] = value;
             return true;
         }else{
             return false;
         }
     }
     
+    function setString(bytes32 key, string value) public returns (bool success){
+        if (registeredUsers[msg.sender]){   //allow only registered user to set value
+            stringDatabase[msg.sender].strValue[key] = value;
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    
 
 
     /* getter for database */
     
-    function getNumber(bytes32 key) public returns (uint val){
+    function getNumber(bytes32 key) public returns (uint value){
         if (registeredUsers[msg.sender]){   
-           return numData[msg.sender].num[key];
+           return numDatabase[msg.sender].numValue[key];
         }else{
             return 0;
         }
     }
+    
+    function getString(bytes32 key) public returns (string value){
+        if (registeredUsers[msg.sender]){   
+           return stringDatabase[msg.sender].strValue[key];
+        }else{
+            return "null";
+        }
+    }
+    
 
 }
