@@ -1,0 +1,111 @@
+pragma solidity^0.4.0;
+contract ledger{
+    
+    string constant nullString = "nullString";
+    
+    /* creating map to store data of different datatypes */
+    struct numStruct {
+        mapping(bytes32=>uint) numData;
+        bool exist; 
+        address owner;
+    }
+    mapping(bytes32=>string) stringData;
+    mapping(bytes32=>bytes32) byteData;
+    
+    /* map to store address of registered user */
+    mapping(address=>bool) registeredUsers;
+    
+    /*contract owner address*/
+    address contractOwner;
+    
+    /* constructor to store owner address */
+    function ledger() public{
+        contractOwner=msg.sender;
+        registeredUsers[contractOwner]=true;
+    }
+    
+    
+    /* add new user */
+    function registerUser() public returns (bool success){
+        //prevent already registered user to re-register
+        if(registeredUsers[msg.sender]){   
+            return false;
+        }else{
+             registeredUsers[msg.sender]=true;
+             return true;
+        }
+    }
+    
+    /* remove  existing user */
+    function removeUser() public returns (bool success){
+        //prevent unregistered user to delete
+        if(registeredUsers[msg.sender]){
+            registeredUsers[msg.sender]=false;
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    
+    
+    /* setter for database */
+    
+    function setNumber(bytes32 key, uint value) public returns (bool success){
+        if (registeredUsers[msg.sender]){   //allow only registered user to set value
+            numStruct val;
+            val.numData[key]=value;
+            val.exist = true;
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    function setString(bytes32 key, string value) public returns (bool success){
+        if (registeredUsers[msg.sender]){
+            stringData[key]=value;
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    function setByte(bytes32 key, bytes32 value)  public returns (bool success){
+        if (registeredUsers[msg.sender]){
+            byteData[key]=value;
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+
+
+    /* getter for database */
+    
+    function getNumber(bytes32 key) public returns (uint value){
+        if (numData[key]!=0){    //if value for that key exist
+           return numData[key] ;
+        }else{
+            return 0;
+        }
+    }
+    
+    // function getString(bytes32 key)  public returns (string value){
+    //     if (stringData[key].){    //if value for that key exist
+    //       return stringData[key] ;
+    //     }else{
+    //         return "nullString";
+    //     }
+    // }
+
+    // function getByte(bytes32 key) public returns (bytes32 value){
+    //     if (byteData[key]!=0){    //if value for that key exist
+    //       return byteData[key] ;
+    //     }else{
+    //         return 0;
+    //     }
+    // }
+
+}
