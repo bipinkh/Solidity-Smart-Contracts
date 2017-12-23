@@ -151,3 +151,51 @@ contract media{
     
 }
 
+
+contract ownershipTransfer{
+    
+    users u;
+    media m;
+    
+    struct transaction{ //a single transaction entry
+        uint transactionID;
+        uint price;
+        address from;
+        address to;
+    }
+    
+    struct mediaTransaction{
+        uint latestTransactionID;
+        mapping (uint => transaction) mediaTransactionHistory;  //mapping to store all history of a particular media hash
+    }
+    
+    mapping (bytes32 => mediaTransaction ) allHistory;  //mapping to store all history of any media hash
+    
+    
+    
+    function buyMedia(bytes32 hash) public payable returns(bool){
+        uint sellPrice = m.getPrice(hash);
+        address owner = m.getOwner(hash);
+        require( m._buy(hash) );
+        _storeATransaction(hash,sellPrice,owner,msg.sender);
+        return true;
+    }
+    
+    
+    function _storeATransaction(bytes32 hash, uint price, address from, address to) public{
+        var resource = allHistory[hash];                
+        
+        uint newID = resource.latestTransactionID + 1;
+        resource.latestTransactionID = newID;
+        
+        var newTransaction = resource.mediaTransactionHistory[newID];
+        
+        newTransaction.transactionID = newID;
+        newTransaction.price = price;
+        newTransaction.from = from;
+        newTransaction.to = to;
+    }
+    
+    
+}
+
