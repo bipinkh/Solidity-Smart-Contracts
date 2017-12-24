@@ -182,7 +182,6 @@ contract ownershipTransfer is users, media{
         return true;
     }
     
-    
     function _storeATransaction(bytes32 hash, uint price, address from, address to) internal returns(bool){
         mediaTransaction resource = allHistory[hash];                
         
@@ -205,10 +204,19 @@ contract ownershipTransfer is users, media{
         return media.lastTxnId;
     }
     
-    function getTransactionHistory(bytes32 hash) public{
+    
+    function getPreviousOwners(bytes32 hash) public isAvailable(hash) constant returns(address[]){
+        address[] allOwners;
+        
         mediaTransaction media = allHistory[hash];
         
+        for (uint i=0; i<=media.lastTxnId; i++){
+            allOwners.push(media.mediaHistory[i].from);
+        }
+        
+        return allOwners;
     }
+    
     
     
 }
