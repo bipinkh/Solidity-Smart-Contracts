@@ -207,16 +207,15 @@ contract ownershipTransfer is users, media{
     
     function getPreviousOwners(bytes32 hash) public isAvailable(hash) constant returns(address[]){
         address[] allOwners;
-        
         mediaTransaction media = allHistory[hash];
         
-        for (uint i=0; i<=media.lastTxnId; i++){
+        for (uint i=1; i<=media.lastTxnId; i++){
             allOwners.push(media.mediaHistory[i].from);
         }
         
         return allOwners;
     }
-    
+
     
     
 }
