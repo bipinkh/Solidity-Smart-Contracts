@@ -122,7 +122,7 @@ contract media{
     }
     
     //set new price
-    function setNewPriceOf(bytes32 hash, uint newPrice) view public isAvailable(hash) legalCurrentOwner(hash) returns(bool){
+    function setNewPriceOf(bytes32 hash, uint newPrice) public isAvailable(hash) legalCurrentOwner(hash) returns(bool){
         var md = mediaDetailsMap[hash];
         md.price = newPrice;
         return true;
@@ -159,24 +159,25 @@ contract ownershipTransfer is users, media{
     }
     
     struct mediaTransaction{    
-        uint[] txnIDlists;                          //list to store transactionID
+        uint lastTxnId;                                  //also the total number of transaction of that media
         mapping (uint => transaction) mediaHistory;  // mapping to all transactions of a particular media
     }
     
     mapping (bytes32 => mediaTransaction ) allHistory;  //mapping to store all history of all media
     
     
-    function buyMedia(bytes32 hash) public isAvailable(hash) isSellable(hash) payable returns(bool){
+    function buyMedia(bytes32 hash) public isAvailable(hash) isSellable(hash) payable userExists(msg.sender) returns(bool){
         
         uint sellPrice = getPriceOf(hash);  //check if sent price is greater than the selling price
         require (msg.value >= sellPrice);
         
         address owner = getOwnerOf(hash);   //get current owner of media and transfer fund to it
+        require(owner != msg.sender);       //owner cannot buy his own media
         owner.transfer(msg.value);             
         
         require( _changeOwner(hash) );      //change ownership of media
         
-        require( _storeATransaction(hash,sellPrice,owner,msg.sender) );    //record that transaction
+        _storeATransaction(hash,sellPrice,owner,msg.sender);    //record that transaction
         
         return true;
     }
@@ -185,9 +186,8 @@ contract ownershipTransfer is users, media{
     function _storeATransaction(bytes32 hash, uint price, address from, address to) internal returns(bool){
         mediaTransaction resource = allHistory[hash];                
         
-        uint lastTxnId = resource.txnIDlists [ resource.txnIDlists.length - 1 ] ;    //get the value of the latest transaction id
-        uint currentTxnId = lastTxnId + 1 ;
-        resource.txnIDlists.push( currentTxnId );                                   //append new transaction id to the array
+        uint currentTxnId = resource.lastTxnId + 1;
+        resource.lastTxnId = currentTxnId;
         
         transaction newTransaction = resource.mediaHistory[currentTxnId];    //create a new transaction
         
@@ -202,11 +202,10 @@ contract ownershipTransfer is users, media{
     
     function getNumberOfSoldTimes(bytes32 hash) public constant returns(uint txnTimes){
         mediaTransaction media = allHistory[hash];
-        uint lastTxnId = media.txnIDlists [ media.txnIDlists.length - 1 ] ;    //get the value of the latest transaction id
-        return lastTxnId;
+        return media.lastTxnId;
     }
     
-    function getTransactionHistory(bytes32 hash){
+    function getTransactionHistory(bytes32 hash) public{
         mediaTransaction media = allHistory[hash];
         
     }
