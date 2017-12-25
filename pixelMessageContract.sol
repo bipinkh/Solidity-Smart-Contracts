@@ -22,19 +22,23 @@ contract users{
         require( userDetailMap[add].isAccountActive == true);
         _;
     }
+     modifier userDontExists(address add){
+        require( userDetailMap[add].isAccountActive == false);
+        _;
+    }
     modifier userVisible(address add){
         require( userDetailMap[add].privateAccount == false);
         _;
     }
 
     /* functions */
-    function registerUser() public returns (bool){
+    function registerMe() public userDontExists(msg.sender) returns(bool){
         var udetails = userDetailMap[msg.sender];
         udetails.isAccountActive = true;
         return true;
     }
     
-    function setUserDetails(bool privateAccount, string name, string country) public userExists(msg.sender) returns(bool){
+    function setMyDetails(bool privateAccount, string name, string country) public userExists(msg.sender) returns(bool){
         var udetails = userDetailMap[msg.sender];
         udetails.privateAccount = privateAccount;
         udetails.name = name; 
@@ -46,7 +50,7 @@ contract users{
         return (userDetailMap[userAddress].name , userDetailMap[userAddress].country);
     }
     
-    function deketeUser() public userExists(msg.sender) returns (bool){
+    function deketeMe() public userExists(msg.sender) returns (bool){
         var udetails = userDetailMap[msg.sender];
         udetails.isAccountActive = false;
         return true;
@@ -95,7 +99,7 @@ contract media{
     
     // upload a media
     function createMedia(bytes32 hash, bool sellable, uint price) public noDuplicateMedia(hash) returns(bool){
-        mediaDetails md = mediaDetailsMap[hash];
+        var md = mediaDetailsMap[hash];
         md.isAvailable = true;
         md.isSellable = sellable;
         md.price = price;
@@ -105,7 +109,7 @@ contract media{
     }
     
     //delete a media
-    function deleteMedia(bytes32 hash) public isAvailable(hash) returns(bool){
+    function deleteMedia(bytes32 hash) public isAvailable(hash) legalCurrentOwner(hash) returns(bool){
         var md = mediaDetailsMap[hash];
         md.isAvailable = false;
         return true;
@@ -117,8 +121,13 @@ contract media{
     }
     
     //get the price of media
-    function getOwnerOf(bytes32 hash) view public isAvailable(hash) returns(address){   
+    function getCurrentOwnerOf(bytes32 hash) view public isAvailable(hash) returns(address){   
         return mediaDetailsMap[hash].currentAuthor;
+    }
+    
+    //get the original author of media
+    function getOriginalOwnerOf(bytes32 hash) view public isAvailable(hash) returns(address){   
+        return mediaDetailsMap[hash].originalAuthor;
     }
     
     //set new price
@@ -171,7 +180,7 @@ contract ownershipTransfer is users, media{
         uint sellPrice = getPriceOf(hash);  //check if sent price is greater than the selling price
         require (msg.value >= sellPrice);
         
-        address owner = getOwnerOf(hash);   //get current owner of media and transfer fund to it
+        address owner = getOriginalOwnerOf(hash);   //get current owner of media and transfer fund to it
         require(owner != msg.sender);       //owner cannot buy his own media
         owner.transfer(msg.value);             
         
@@ -199,24 +208,35 @@ contract ownershipTransfer is users, media{
         return true;
     }
     
+    //get the number of times of transaction of any media
     function getNumberOfSoldTimes(bytes32 hash) public constant returns(uint txnTimes){
-        mediaTransaction media = allHistory[hash];
-        return media.lastTxnId;
+        mediaTransaction asset = allHistory[hash];
+        return asset.lastTxnId;
     }
     
-    
-    function getPreviousOwners(bytes32 hash) public isAvailable(hash) constant returns(address[]){
+    // get all previous owners of a media
+    function getPreviousOwners(bytes32 hash) public isAvailable(hash) returns(address[]){
         address[] allOwners;
         mediaTransaction media = allHistory[hash];
         
+        //push the original author first
+        allOwners.push(getOriginalOwnerOf(hash));
+        
+        //push the buyers of that media
         for (uint i=1; i<=media.lastTxnId; i++){
             allOwners.push(media.mediaHistory[i].from);
         }
         
         return allOwners;
     }
-
     
+    //get all details of a particular transaction of a media
+    function getDetailsOfTxnID(bytes32 hash, uint txnNo) public returns(uint price, address seller, address buyer){
+        mediaTransaction asset = allHistory[hash];
+        require (asset.lastTxnId >= txnNo);             //make sure the transaction number is valid
+        transaction txn = asset.mediaHistory[txnNo];
+        return(txn.price, txn.from, txn.to);
+    }
     
 }
 
