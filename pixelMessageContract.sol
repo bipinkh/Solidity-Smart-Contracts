@@ -214,9 +214,10 @@ contract ownershipTransfer is users, media{
         return asset.lastTxnId;
     }
     
+    address[] allOwnersList;
     // get all previous owners of a media
-    function getPreviousOwners(bytes32 hash) public isAvailable(hash) returns(address[]){
-        address[] allOwners;
+    function getPreviousOwners(bytes32 hash)view  public isAvailable(hash) returns(address[]){
+        var allOwners = allOwnersList;
         mediaTransaction media = allHistory[hash];
         
         //push the original author first
