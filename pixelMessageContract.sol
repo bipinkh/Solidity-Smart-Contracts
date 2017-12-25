@@ -57,99 +57,171 @@ contract users{
     }
 }
 
+pragma solidity ^0.4.17;
 
 
 contract media{
-     
-    struct mediaDetails{
-        bool isAvailable;   //false if deleted
+    
+    struct mediaDetails{            //made separate for each copy of media
+        bool isAvailable;           //false if deleted
         bool isSellable;
         uint price;
-        address originalAuthor;
-        address currentAuthor;
     }
     
-    mapping (bytes32 => mediaDetails) mediaDetailsMap;  //media hash to media details
-    address contractOwner;
-    
-    /* constructor */
-    function media() public{
-        contractOwner = msg.sender;
-    }
+     struct mediaRoot{
+         address originalAuthor;
+         uint maxAllowedCopies;  // maximum number the original copies can be sold by the original author
+         uint soldCopies;    //copies already sold
+         mapping (address => uint) copiesMap;                   //copy author to copy number
+         mapping (uint => mediaDetails) mediaDetailsMap;    //copy number to copyDetails.
+     }
+     
+    mapping (bytes32 => mediaRoot) mediaRootMap;
     
     /* modifiers*/
-    modifier isSellable(bytes32 hash){                                  // if it is available for trade
-        require( mediaDetailsMap[hash].isSellable == true );
+    
+    modifier isSellable(bytes32 hash, address usr){                 // if it is available for trade
+        var root = mediaRootMap[hash];
+        var copyNum = root.copiesMap[usr];
+        require( root.mediaDetailsMap[copyNum].isSellable == true );
         _;
     }
-    modifier isAvailable(bytes32 hash){                                  // media exists or is not deleted
-        require( mediaDetailsMap[hash].isAvailable == true );
-        _;
-    }   
-    modifier legalCurrentOwner(bytes32 hash){                           // if the media belongs to the correct current Author
-        require( mediaDetailsMap[hash].currentAuthor == msg.sender);
+    modifier isAvailable(bytes32 hash, address usr){                // media exists for that user
+        var root = mediaRootMap[hash];
+        var copyNum = root.copiesMap[usr];
+        require( root.mediaDetailsMap[copyNum].isAvailable == true );
         _;
     }
-    modifier noDuplicateMedia(bytes32 hash){                                  // check if that media already existed
-        require( mediaDetailsMap[hash].isAvailable != true );
+    
+    modifier legalCurrentOwner(bytes32 hash, address usr){          // media belongs to the correct current Author
+        var root = mediaRootMap[hash];
+        var copyNum = root.copiesMap[usr];
+        require(copyNum != 0);                                      // the given address should be mapped to a valid copy number
+        _;
+    }
+    
+    modifier mediaDoesntExist(bytes32 hash){                                  // check if that media already existed
+        require( mediaRootMap[hash].originalAuthor == 0x0  );
         _;
     } 
+    modifier mediaExists(bytes32 hash){                                             // if the media already exists
+        require( mediaRootMap[hash].originalAuthor !=0x0 );
+        _;
+    }
+    
 
     /* functions */
     
     // upload a media
-    function createMedia(bytes32 hash, bool sellable, uint price) public noDuplicateMedia(hash) returns(bool){
-        var md = mediaDetailsMap[hash];
+    function createMedia(bytes32 hash, bool sellable, uint price, uint maxAllowedCopies) 
+        public mediaDoesntExist(hash) returns(bool){
+        
+        //create media root
+        var root = mediaRootMap[hash];
+        root.originalAuthor = msg.sender;
+        root.maxAllowedCopies = maxAllowedCopies; //copynumber 1 is associated with original Author
+        root.soldCopies=0;
+        
+        //create first original copy details
+        uint copyNum = 1;                           //1st copy of the original media
+        var md = root.mediaDetailsMap[copyNum];   //create details of original copy
         md.isAvailable = true;
         md.isSellable = sellable;
         md.price = price;
-        md.originalAuthor = msg.sender;
-        md.currentAuthor = msg.sender;
         return true;
     }
     
     //delete a media
-    function deleteMedia(bytes32 hash) public isAvailable(hash) legalCurrentOwner(hash) returns(bool){
-        var md = mediaDetailsMap[hash];
+    function deleteMedia(bytes32 hash) public isAvailable(hash, msg.sender) legalCurrentOwner(hash, msg.sender) returns(bool){
+        //make that particular copy deleted
+        var copyNum = mediaRootMap[hash].copiesMap[msg.sender];
+        var md = mediaRootMap[hash].mediaDetailsMap[copyNum];
         md.isAvailable = false;
         return true;
     }
     
     //get the price of media
-    function getPriceOf(bytes32 hash) view public isAvailable(hash) isSellable(hash) returns(uint){   
-        return mediaDetailsMap[hash].price;
+    function getPriceOf(bytes32 hash, address owner) view public isAvailable(hash, owner) isSellable(hash, owner) returns(uint){   
+         var copyNum = mediaRootMap[hash].copiesMap[owner];
+        return mediaRootMap[hash].mediaDetailsMap[copyNum].price;
     }
     
-    //get the price of media
-    function getCurrentOwnerOf(bytes32 hash) view public isAvailable(hash) returns(address){   
-        return mediaDetailsMap[hash].currentAuthor;
+    function getOriginalPriceOf(bytes32 hash) view public returns(uint){
+        var root = mediaRootMap[hash];
+        var num = getPriceOf(hash,root.originalAuthor);
+        return num;
+    }
+    
+    //get the sold copies of any media
+    function getSoldCopiesNumber(bytes32 hash) view public mediaExists(hash) returns(uint){   
+        return mediaRootMap[hash].soldCopies;
     }
     
     //get the original author of media
-    function getOriginalOwnerOf(bytes32 hash) view public isAvailable(hash) returns(address){   
-        return mediaDetailsMap[hash].originalAuthor;
+    function getOriginalOwnerOf(bytes32 hash) view public mediaExists(hash) returns(address){   
+        var root = mediaRootMap[hash];
+        return root.originalAuthor;
     }
     
     //set new price
-    function setNewPriceOf(bytes32 hash, uint newPrice) public isAvailable(hash) legalCurrentOwner(hash) returns(bool){
-        var md = mediaDetailsMap[hash];
+    function setNewPriceOf(bytes32 hash, uint newPrice) public legalCurrentOwner(hash,msg.sender) isAvailable(hash, msg.sender)  returns(bool){
+        var copyNum = mediaRootMap[hash].copiesMap[msg.sender];
+        var md = mediaRootMap[hash].mediaDetailsMap[copyNum];
         md.price = newPrice;
         return true;
     }
     
      //set new sellable status
-    function setSellableStatusOf(bytes32 hash, bool sellStatus) public isAvailable(hash) legalCurrentOwner(hash) returns(bool){
-        var md = mediaDetailsMap[hash];
+    function setSellableStatusOf(bytes32 hash, bool sellStatus) public legalCurrentOwner(hash,msg.sender) isAvailable(hash, msg.sender) returns(bool){
+        var copyNum = mediaRootMap[hash].copiesMap[msg.sender];
+        var md = mediaRootMap[hash].mediaDetailsMap[copyNum];
         md.isSellable = sellStatus;
         return true;
     }
     
     //change the media owner
-    function _changeOwner(bytes32 hash)internal isAvailable(hash) isSellable(hash) returns(bool){
-        var md = mediaDetailsMap[hash];
-        md.currentAuthor = msg.sender;
-
+    function _changeOwner(bytes32 hash, address from, address to)internal legalCurrentOwner(hash,from) isAvailable(hash, from) returns(bool){
+        
+        require(mediaRootMap[hash].originalAuthor != from); // this function is only to transfer ownership of duplicate copies, not original
+        
+        var copyNum = mediaRootMap[hash].copiesMap[from];
+        //map the copynumber to buyer address
+        mediaRootMap[hash].copiesMap[from] = copyNum;
+        //assign 0 copynumber to the seller address
+        mediaRootMap[hash].copiesMap[from] = 0;
         return true;
+    }
+    
+    //makeDuplicate
+    function _makeDuplicate(bytes32 hash, address buyer, bool sellable, uint price)internal mediaExists(hash) returns(bool){
+        var root = mediaRootMap[hash];
+        
+        require(root.originalAuthor != buyer);
+        require(root.soldCopies < root.maxAllowedCopies);
+        
+        root.soldCopies += 1;
+        //map the copynumber to buyer address
+        mediaRootMap[hash].copiesMap[buyer] = root.soldCopies;
+        //create details of the coresponding copy
+        var md = root.mediaDetailsMap[root.soldCopies];  
+        md.isAvailable = true;
+        md.isSellable = sellable;
+        md.price = price;
+        
+        if(root.soldCopies == root.maxAllowedCopies){
+            //assign 0 copynumber to the original author if all maximum allowed copies are sold
+            mediaRootMap[hash].copiesMap[root.originalAuthor] = 0;
+        }
+        return true;
+    }
+    
+    
+    
+    function buy(bytes32 hash, address from) public{
+        _changeOwner(hash,from,msg.sender);
+    }
+    function duplicate(bytes32 hash, bool sellable, uint newPrice) public{
+        _makeDuplicate(hash,msg.sender, sellable, newPrice);
     }
     
 }
