@@ -41,10 +41,9 @@ contract nepCurrency{
     }
     
     
-    mapping (address => uint[]) public mintIdMap;                      //maps address of minters to the mint_id
+    mapping (address => uint[]) public mintIdMap;                      //maps address of minter to the all the mint_id he have ever minted
     mapping (uint => mintDetail) public mintDetailMap;                 //maps mint_id to mintDetail
-    
-    mapping (uint => mintersTransaction[]) public mintersTxnMap;       //maps mint_id to mintDetail
+    mapping (uint => mintersTransaction[]) public mintersTxnMap;       //maps mint_id to array of all transactions
     
     address[] public currentMinters;                                   //hold addresses of current minters
     mapping (address => uint) public currentMintersIndex;              //to store index of array of currentMinters
@@ -68,6 +67,8 @@ contract nepCurrency{
         name = _name;
         symbol = _symbol;
         creator= msg.sender;
+        
+        currentMinters.push(0x0);       //initially store a 0 address, just to make the index start with 1 (for simplicity)
     }
     
     
@@ -89,8 +90,7 @@ contract nepCurrency{
         mintDetailMap[ id ].currentUsersIndex[ minter ] = mintDetailMap[ id ].currentUsers.length-1;
         mintDetailMap[ id ].currentUsersBalance[ minter ] = initial_supply;
         
-        //update current minters list
-        currentMinters.push(0x0); 
+        //update current minters list 
         currentMinters.push(minter);
         currentMintersIndex[minter] = currentMinters.length;
         
@@ -156,4 +156,3 @@ contract nepCurrency{
         return(true);
     }
 }
-
