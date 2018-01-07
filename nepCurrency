@@ -1,0 +1,159 @@
+pragma solidity ^0.4.17;
+
+contract nepCurrency{
+    
+    /*
+        when a party mints coin, he will get 
+        1. mint_id (auto increment value)
+        2. mintDetail (to hold the total coins minted, minted date etc
+            and
+        3. an empty array of mintersTransaction to store all the txn history 
+    */
+    
+    
+    /* coin parameters */
+    uint256 total_coin;                                  //max coins
+    string name;                                        //name of coin
+    string symbol;                                      //symbol of coin
+    address creator;                                    //address of original creator
+    uint mintedTimes;                                    //total number of times of coin minted , increased with each mint.
+    
+    
+    /* struct mintDetail holds all the details when a party mints some coin  */
+    struct mintDetail{
+       uint256 initial_deposit;
+       uint256 current_balance;
+       uint256 date_minted;
+       bool coinBurnt;                                      //is false until all the minted coins are burnt
+       
+       address[] currentUsers;                              //hold addresses of current users
+        mapping (address => uint) currentUsersIndex;        //to store index of array of currentusers
+        mapping (address => uint) currentUsersBalance;      //to store balance of currentusers
+            
+    }
+    
+     /* struct mintersTransaction to store the transaction details of transfer of amount from any minters account */
+    struct mintersTransaction{
+        address buyer;
+        address seller;
+        uint256 balance;
+        uint256 timestamp;
+    }
+    
+    
+    mapping (address => uint[]) public mintIdMap;                      //maps address of minters to the mint_id
+    mapping (uint => mintDetail) public mintDetailMap;                 //maps mint_id to mintDetail
+    
+    mapping (uint => mintersTransaction[]) public mintersTxnMap;       //maps mint_id to mintDetail
+    
+    address[] public currentMinters;                                   //hold addresses of current minters
+    mapping (address => uint) public currentMintersIndex;              //to store index of array of currentMinters
+
+    
+    /* modifiers */
+    modifier isCreator(){
+        require(msg.sender == creator);
+        _;
+    }
+    
+    modifier hasEnoughBalance(uint mintid, address seller, uint balance){
+        require ( mintDetailMap[ mintid ].currentUsersBalance[ seller ] >= balance);
+        _;
+    }
+    
+    
+    /* constructor of contract */
+    function nepCurrency(uint256 _total_coin, string _name, string _symbol) public{
+        total_coin = _total_coin;
+        name = _name;
+        symbol = _symbol;
+        creator= msg.sender;
+    }
+    
+    
+    /* minting coin */ 
+    
+    function mint(uint initial_supply, address minter) public isCreator() returns(bool success, uint id ){
+        
+        //get the mint_id
+        mintedTimes++;
+        id = mintedTimes;
+        
+        // record mint details
+        mintIdMap[ minter ].push(id);
+        mintDetailMap[ id ].initial_deposit = initial_supply;
+        mintDetailMap[ id ].current_balance = initial_supply;
+        mintDetailMap[ id ].date_minted = now;
+        mintDetailMap[ id ].coinBurnt = false;
+        mintDetailMap[ id ].currentUsers.push(minter);
+        mintDetailMap[ id ].currentUsersIndex[ minter ] = mintDetailMap[ id ].currentUsers.length-1;
+        mintDetailMap[ id ].currentUsersBalance[ minter ] = initial_supply;
+        
+        //update current minters list
+        currentMinters.push(0x0); 
+        currentMinters.push(minter);
+        currentMintersIndex[minter] = currentMinters.length;
+        
+        return (true , id);
+    }
+    
+    
+    /* burn some coin */
+    
+    function burn(address minter, uint balance) public isCreator() returns(bool success){
+        
+        //get the latest mint id of minter
+        uint id = mintIdMap[ minter ] [ mintIdMap[minter].length];
+        
+        require( mintDetailMap[id].current_balance > 0 );
+        require( mintDetailMap[id].current_balance >= balance );
+        
+        //decrease coin amount of minter
+        mintDetailMap[id].current_balance -= balance;
+        
+        //check if all coins are burnt
+        if (mintDetailMap[id].current_balance == 0){
+            mintDetailMap[id].coinBurnt = true;
+            delete currentMinters[ currentMintersIndex[minter] ];
+            currentMinters.length--;
+        }
+        
+        return true;
+        
+    }
+    
+    /* burn all coin */
+    
+    function burnall (address minter)public isCreator() returns (bool success){
+         uint id = mintIdMap[ minter ] [ mintIdMap[minter].length];
+          mintDetailMap[id].current_balance = 0;
+          mintDetailMap[id].coinBurnt = true;
+          delete currentMinters[ currentMintersIndex[minter] ];
+            currentMinters.length--;
+            return true;
+    }
+    
+    /* store when any minted coin is transfered */
+    
+    function transaction(uint mintid, address buyer, address seller, uint balance)public 
+        isCreator() hasEnoughBalance (mintid, seller, balance) returns(bool success){
+        
+        mintersTxnMap[mintid].push( mintersTransaction(buyer,seller,balance,now) );
+        
+        //update mint details
+        if ( mintDetailMap[ mintid ].currentUsersIndex[buyer] != 0){
+            mintDetailMap[ mintid ].currentUsers.push(buyer);
+            mintDetailMap[ mintid ].currentUsersBalance[ buyer ] = 0;
+        }
+         mintDetailMap[ mintid ].currentUsersBalance[ buyer ] += balance;
+        mintDetailMap[ mintid ].currentUsersBalance[ seller ] -= balance;
+        
+         if (mintDetailMap[mintid].currentUsersBalance[ seller ] == 0){
+            delete mintDetailMap[ mintid ].currentUsers[   mintDetailMap[ mintid ].currentUsersIndex[seller]    ];
+            mintDetailMap[ mintid ].currentUsers.length--;
+        }
+
+        return(true);
+    }
+}
+
