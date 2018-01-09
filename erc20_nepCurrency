@@ -13,8 +13,10 @@ contract ERC20Token {
     uint256 public totalSupply;
     address creator;
     
-    uint256 transactionFee = 1;         //don't know how to calculate this in dynamic
-
+    uint public transactionFeeRate = 1;        // 1 percent transaction fee
+    uint public minTransactionFee = 100;       //100 rupees
+    uint public maxTransactionFee = 1000;     // 1 thousand 
+    
     function getBalanceOf(address _tokenOwner) public constant returns (uint balance);
     function transfer(address _to, uint _tokens) public returns (bool success);
     function transferFrom(address _from, address _to, uint _tokens) public returns (bool success);
@@ -24,6 +26,7 @@ contract ERC20Token {
     event Transfer(address indexed from, address indexed to, uint tokens);
     event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
     event Burn(address indexed from, uint256 value);
+    event Mint(address minter, uint256 balance);
      
     mapping (address => uint256 ) public balanceOf;
     mapping (address => mapping (address => uint256) ) public allowance;
@@ -63,12 +66,17 @@ contract nepCurrency is ERC20Token{
     /**
      * minting coins
      * 
-     * here, the logic is that only after the creator receives cash, he can mint some coins and send to the minter
+     * here, the logic is that only after the creator receives cash, he can mint coins and send to the minter
     */
     
     function mint(address _minter, uint256 _balance) public isCreator() returns(bool success){
-        balanceOf[_minter] += _balance;
-        totalSupply += _balance;
+        
+        uint _txnFee = calculateTxnFee(_balance);
+        require(balanceOf[_minter] + _balance - _txnFee > balanceOf[_minter]);      // Check for overflows
+        balanceOf[_minter] += _balance - _txnFee;
+        totalSupply += _balance + _txnFee;
+        balanceOf[creator] += _txnFee;                      //creator collects transaction fee
+        Mint(_minter, _balance);                            //set out event
         return true;
     }
     
@@ -104,19 +112,23 @@ contract nepCurrency is ERC20Token{
     
     function _transfer(address _from, address _to, uint _value) internal {
         
+        uint _txnFee = calculateTxnFee(_value);
+        
         require(_to != 0x0);                                    // Prevent transfer to 0x0 address
         
         require(balanceOf[_from] >= _value);                    // Check if the sender has enough
         
-        require(balanceOf[_to] + _value > balanceOf[_to]);      // Check for overflows
+        require(balanceOf[_to] + _value - _txnFee > balanceOf[_to]);      // Check for overflows
         
-        uint previousBalances = balanceOf[_from] + balanceOf[_to]; // Save this for an assertion in the future
+        uint previousBalances = balanceOf[_from] + balanceOf[_to] ; // Save this for an assertion in the future
         
         balanceOf[_from] -= _value;                             // Subtract from the sender
         
-        balanceOf[_to] += _value;                               // Add the same to the recipient
+        balanceOf[_to] += _value - _txnFee;                               // Add the same to the recipient
         
-        Transfer(_from, _to, _value);
+        balanceOf[creator] += _txnFee;
+        
+        Transfer(_from, _to, _value - _txnFee);
         
         // Asserts are used to use static analysis to find bugs in your code. They should never fail
         assert(balanceOf[_from] + balanceOf[_to] == previousBalances);
@@ -159,7 +171,22 @@ contract nepCurrency is ERC20Token{
         return true;
     }
     
+    
+    /**
+     * calculate the transactionFee
+    */
+    function calculateTxnFee(uint256 _amount) public returns(uint fee){
 
+        fee = (transactionFeeRate / 100) * _amount;
+        
+        if (fee < minTransactionFee){
+            fee = minTransactionFee;
+        }
+        if (fee > maxTransactionFee){
+            fee = maxTransactionFee;            
+        }
+    
+    }
 
 }
 
