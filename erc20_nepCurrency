@@ -28,9 +28,10 @@ contract ERC20Token {
     event Burn(address indexed from, uint256 value);
     event Mint(address minter, uint256 balance);
      
-    mapping (address => uint256 ) public balanceOf;
+    mapping (address => uint256 ) public balanceOf;                     // uint256 is the balance in paisaa
     mapping (address => mapping (address => uint256) ) public allowance;
-
+    
+    address notary;
 }
 
 
@@ -50,15 +51,18 @@ contract nepCurrency is ERC20Token{
     }
 
 
-    /** constructor of contract    **/
+    /** 
+     * constructor of contract    
+    */
     
-    function nepCurrency(uint256 _initialSupply, string _name, string _symbol) public{
+    function nepCurrency(uint256 _initialSupply, string _name, string _symbol, address _notary) public{
 
         totalSupply = _initialSupply + 10 ** uint256(decimals);
         creator= msg.sender;
         balanceOf[msg.sender] = totalSupply;
         name = _name;
         symbol = _symbol;
+        notary = _notary;
         
     }
     
@@ -67,16 +71,27 @@ contract nepCurrency is ERC20Token{
      * minting coins
      * 
      * here, the logic is that only after the creator receives cash, he can mint coins and send to the minter
+     * 
+     * @param _balance is the amount in paisaa  
     */
     
-    function mint(address _minter, uint256 _balance) public isCreator() returns(bool success){
+    function mint(address _minter, uint256 _balance, bytes32 _signedMessage,  uint8 _v, bytes32 _r, bytes32 _s)
+        public isCreator() returns(bool success){
         
-        uint _txnFee = calculateTxnFee(_balance);
+        require( verifySignature ( _signedMessage, _v, _r, _s ) );     // check if signature is matched
+
+        uint _txnFee = calculateTxnFee(_balance);                   //calcuate transaction fee
+        
         require(balanceOf[_minter] + _balance - _txnFee > balanceOf[_minter]);      // Check for overflows
+        
         balanceOf[_minter] += _balance - _txnFee;
-        totalSupply += _balance + _txnFee;
+        
+        totalSupply += _balance ;
+        
         balanceOf[creator] += _txnFee;                      //creator collects transaction fee
+        
         Mint(_minter, _balance);                            //set out event
+        
         return true;
     }
     
@@ -84,10 +99,10 @@ contract nepCurrency is ERC20Token{
     /**
      * burning coin
      * 
-     * any user can burn his/her coin
+     * any user can burn his/her coin, but this function can only be called by creator
     */
     
-    function burn(uint256 _value) public returns (bool success) {
+    function burn(uint256 _value) public isCreator() returns (bool success) {
         require(balanceOf[msg.sender] >= _value);   // Check if the sender has enough
         balanceOf[msg.sender] -= _value;            // Subtract from the sender
         totalSupply -= _value;                      // Updates totalSupply
@@ -175,7 +190,7 @@ contract nepCurrency is ERC20Token{
     /**
      * calculate the transactionFee
     */
-    function calculateTxnFee(uint256 _amount) public returns(uint fee){
+    function calculateTxnFee(uint256 _amount) public view returns(uint fee){
 
         fee = (transactionFeeRate / 100) * _amount;
         
@@ -186,6 +201,15 @@ contract nepCurrency is ERC20Token{
             fee = maxTransactionFee;            
         }
     
+    }
+    
+    /**
+     * verify if the signature matches to notary
+     * 
+    */
+    function verifySignature (bytes32 _sign, uint8 v, bytes32 r, bytes32 s)public view returns (bool verified){
+        
+        return ecrecover(_sign, v, r, s) == notary;
     }
 
 }
