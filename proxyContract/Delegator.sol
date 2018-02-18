@@ -16,7 +16,6 @@ contract Delegator is Upgradeable {
         function Delegator(address target, address datastore) {
             replace(target);
             dataStore(datastore);
-            dStore = DataStore(_store);
         }
 
         function initialize() {
@@ -29,6 +28,7 @@ contract Delegator is Upgradeable {
         }
 
         function (){
+            dStore = DataStore(_store); //create an updated reference to data contract
            var target = _dest;
             assembly {
                 calldatacopy(0x0, 0x0, calldatasize)
