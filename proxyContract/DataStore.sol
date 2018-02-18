@@ -4,7 +4,6 @@ pragma solidity ^0.4.17;
 
 contract DataStore{
     
-    uint public myData;
 
     mapping(bytes32 => uint) UIntStorage;
 

@@ -1,20 +1,31 @@
 pragma solidity ^0.4.17;
 
 import "browser/Upgradable.sol";
+import "browser/DataStore.sol";
 
 
 contract Delegator is Upgradeable {
     
-    uint256 public myData;
+        DataStore dStore;
+        
+        //this is just for testing
+    function getUint() public constant returns (uint) {
+        return dStore.getUIntValue(sha3("MyData"));
+    }
     
         function Delegator(address target, address datastore) {
             replace(target);
             dataStore(datastore);
+            dStore = DataStore(_store);
         }
 
         function initialize() {
             // This is just a proxy, nothing to initialize here
             revert;
+        }
+        
+        function changeAddress(address target) internal returns(bool){
+            replace(target);
         }
 
         function (){
@@ -33,6 +44,4 @@ contract Delegator is Upgradeable {
                 }
             }
         }
-
-    
 }

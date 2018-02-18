@@ -13,5 +13,6 @@ contract runner{
     function setInt(uint256 a) returns (uint){
        del.call(bytes4(sha3("setUint(uint256)")), a);
     }
+
     
 }
